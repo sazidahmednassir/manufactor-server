@@ -42,14 +42,15 @@ async function run() {
 
     const verifyAdmin = async (req, res, next) => {
       const requester = req.decoded.email;
-      const requesterAccount = await userCollection.findOne({ email: requester });
-      if (requesterAccount.role === 'admin') {
+      const requesterAccount = await userCollection.findOne({
+        email: requester,
+      });
+      if (requesterAccount.role === "admin") {
         next();
+      } else {
+        res.status(403).send({ message: "forbidden" });
       }
-      else {
-        res.status(403).send({ message: 'forbidden' });
-      }
-    }
+    };
 
     app.get("/products", async (req, res) => {
       const limit = Number(req.query.limit);
@@ -68,13 +69,21 @@ async function run() {
       res.send(service);
     });
 
-  app.post("/product", verifyJWT, verifyAdmin, async(req,res)=>{
-    const product=req.body;
-    console.log(product)
-    const  result= await toolsCollection.insertOne(product);
-    res.send(result)
-  })
+    app.post("/product", verifyJWT, verifyAdmin, async (req, res) => {
+      const product = req.body;
+      console.log(product);
+      const result = await toolsCollection.insertOne(product);
+      res.send(result);
+    });
 
+    app.delete("/product/:id", verifyJWT, verifyAdmin, async (req, res) => {
+      const id = req.params.id;
+      const filter = { _id: ObjectId(id) };
+
+      const result = await toolsCollection.deleteOne(filter);
+
+      res.send(result);
+    });
 
     app.patch("/order/:id", async (req, res) => {
       const id = req.params.id;
@@ -105,7 +114,7 @@ async function run() {
       }
     });
 
-    app.get("/admin/:email",  async (req, res) => {
+    app.get("/admin/:email", async (req, res) => {
       const email = req.params.email;
       const user = await userCollection.findOne({ email: email });
       const isAdmin = user.role === "admin";
@@ -117,7 +126,7 @@ async function run() {
       res.send(users);
     });
 
-    app.put("/user/admin/:email", verifyJWT, verifyAdmin,  async (req, res) => {
+    app.put("/user/admin/:email", verifyJWT, verifyAdmin, async (req, res) => {
       const email = req.params.email;
       const filter = { email: email };
       const updateDoc = {
