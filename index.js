@@ -5,6 +5,10 @@ const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 require("dotenv").config();
 const app = express();
 const port = process.env.PORT || 5000;
+const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+var nodemailer = require('nodemailer');
+var sgTransport = require('nodemailer-sendgrid-transport');
+
 
 app.use(cors());
 app.use(express.json());
@@ -32,6 +36,46 @@ function verifyJWT(req, res, next) {
   });
 }
 
+var emailSenderOptions = {
+  auth: {
+    api_key: process.env.EMAIL_SENDER_KEY
+  }
+}
+
+const  emailClient = nodemailer.createTransport(sgTransport(emailSenderOptions));
+
+function sendOrderConfirmationEmail(order){
+  const {tool, price, totalprice, quantity, userName, address, user  } = order;
+
+  var email = {
+    from: process.env.EMAIL_SENDER,
+    to: user,
+    subject: `Your Order for ${tool} is  taken`,
+    text: `Your Order for ${tool} is  taken`,
+    html: `
+    <div>
+      <p> Hello ${userName}, </p>
+      <h3>Thank you for your Order . Your total pay: ${totalprice} </h3>
+      <h3>Please Pay the payment through myOrder section</h3>
+      
+      <h3>Our Address</h3>
+      <p>Halishahar Chittagong Bangladesh</p>
+      <p>Bangladesh</p>
+      
+    </div>
+  `
+  };
+
+  emailClient.sendMail(email, function(err, info){
+    if (err ){
+      console.log(err);
+    }
+    else {
+      console.log('Message sent: ' ,  info);
+    }
+});
+}
+
 async function run() {
   try {
     await client.connect();
@@ -39,6 +83,7 @@ async function run() {
     const toolsCollection = client.db("decomputerparts").collection("tools");
     const ordersCollection = client.db("decomputerparts").collection("orders");
     const userCollection = client.db("decomputerparts").collection("users");
+    const paymentCollection = client.db("decomputerparts").collection('payments');
 
     const verifyAdmin = async (req, res, next) => {
       const requester = req.decoded.email;
@@ -60,6 +105,20 @@ async function run() {
 
       res.send(result);
     });
+
+    app.post('/create-payment-intent', verifyJWT, async(req, res)=>{
+      const service = req.body;
+      console.log(service)
+      const price = service.totalprice;
+      const amount = price*100;
+      const paymentIntent = await stripe.paymentIntents.create({
+        amount : amount,
+        currency: 'usd',
+        payment_method_types:['card']
+      });
+      res.send({clientSecret: paymentIntent.client_secret})
+     })
+  
 
     app.get("/products/:id", async (req, res) => {
       const id = req.params.id;
@@ -88,7 +147,7 @@ async function run() {
     app.patch("/order/:id", async (req, res) => {
       const id = req.params.id;
       const orders = req.body;
-      console.log(orders);
+      // console.log(orders);
       const filter = { _id: ObjectId(id) };
       const updatedDoc = {
         $set: {
@@ -96,11 +155,40 @@ async function run() {
         },
       };
 
+      
+
       const result = await ordersCollection.insertOne(orders.order);
       const updatedTools = await toolsCollection.updateOne(filter, updatedDoc);
-      // sendPaymentConfirmationEmail(payment)
+      sendOrderConfirmationEmail(orders.order)
       res.send(updatedTools);
     });
+
+    app.patch('/payment/:id', verifyJWT,  async(req, res)=>{
+      const id  = req.params.id;
+      const payment = req.body;
+      console.log(payment)
+      const filter = {_id: ObjectId(id)};
+      const updatedDoc = {
+        $set: {
+          paid: true,
+          transactionId: payment.payment.transactionId,
+          status:payment.status
+        }
+      }
+      const result = await paymentCollection.insertOne(payment.payment);
+      const updatedOrder = await ordersCollection.updateOne(filter, updatedDoc);
+      // sendPaymentConfirmationEmail(payment)
+      res.send(updatedOrder);
+
+    })
+
+    app.get('/order/:id', verifyJWT, async(req, res)=>{
+      const id = req.params.id;
+      // console.log(id);
+      const query = {_id: ObjectId(id)};
+      const booking = await ordersCollection.findOne(query);
+      res.send(booking)
+    } )
 
     app.get("/orders", verifyJWT, async (req, res) => {
       const user = req.query.user;
