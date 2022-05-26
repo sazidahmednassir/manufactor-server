@@ -181,17 +181,35 @@ async function run() {
 
     app.patch('/status/:id', verifyJWT,  verifyAdmin, async(req, res)=>{
       const id = req.params.id;
-      const orders = req.body;
-      console.log(orders)
+      const status = req.body;
+      console.log(status)
       const filter = { _id: ObjectId(id) };
       const updatedDoc = {
         $set: {
-          status: orders.status,
+          status: status.status,
         },
       };
       const updatedStatus = await ordersCollection.updateOne(filter, updatedDoc);
       res.send(updatedStatus);
     })
+
+    app.delete("/order/:id", verifyJWT, verifyAdmin, async (req, res) => {
+      const id = req.params.id;
+      const filter = { _id: ObjectId(id) };
+
+      const result = await ordersCollection.deleteOne(filter);
+
+      res.send(result);
+    });
+
+    app.delete("/myorder/:id", verifyJWT,  async (req, res) => {
+      const id = req.params.id;
+      const filter = { _id: ObjectId(id) };
+
+      const result = await ordersCollection.deleteOne(filter);
+
+      res.send(result);
+    });
 
     app.patch('/payment/:id', verifyJWT,  async(req, res)=>{
       const id  = req.params.id;
