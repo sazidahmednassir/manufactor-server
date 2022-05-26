@@ -75,6 +75,39 @@ function sendOrderConfirmationEmail(order){
     }
 });
 }
+function sendPaymentConfirmationEmail(payment){
+  const {tool,  totalprice, quantity, user, transactionId  } = payment;
+
+  var email = {
+    from: process.env.EMAIL_SENDER,
+    to: user,
+    subject: `Your Payment for ${tool} is  taken`,
+    text: `Your Payment for ${tool} is  taken`,
+    html: `
+    <div>
+      <p> Hello , </p>
+      <h3>Thank you for your Order . Your total : ${totalprice} is Paid </h3>
+      <h3>Your Transaction id ${transactionId} For this ${tool} ${quantity} Quantity</h3>
+      
+      
+      <p>You Order will be Shippped by given Address</p>
+      
+      
+    </div>
+  `
+  };
+
+  emailClient.sendMail(email, function(err, info){
+    if (err ){
+      console.log(err);
+    }
+    else {
+      console.log('Message sent: ' ,  info);
+    }
+});
+}
+
+
 
 async function run() {
   try {
@@ -190,6 +223,7 @@ async function run() {
         },
       };
       const updatedStatus = await ordersCollection.updateOne(filter, updatedDoc);
+      
       res.send(updatedStatus);
     })
 
@@ -225,7 +259,7 @@ async function run() {
       }
       const result = await paymentCollection.insertOne(payment.payment);
       const updatedOrder = await ordersCollection.updateOne(filter, updatedDoc);
-      // sendPaymentConfirmationEmail(payment)
+      sendPaymentConfirmationEmail(payment)
       res.send(updatedOrder);
 
     })
