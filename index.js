@@ -259,7 +259,7 @@ async function run() {
       }
       const result = await paymentCollection.insertOne(payment.payment);
       const updatedOrder = await ordersCollection.updateOne(filter, updatedDoc);
-      sendPaymentConfirmationEmail(payment)
+      sendPaymentConfirmationEmail(payment.payment)
       res.send(updatedOrder);
 
     })
