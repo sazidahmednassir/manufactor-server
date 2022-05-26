@@ -84,6 +84,8 @@ async function run() {
     const ordersCollection = client.db("decomputerparts").collection("orders");
     const userCollection = client.db("decomputerparts").collection("users");
     const paymentCollection = client.db("decomputerparts").collection('payments');
+    const reviewCollection = client.db("decomputerparts").collection('reviews');
+    const profileCollection = client.db("decomputerparts").collection('profile');
 
     const verifyAdmin = async (req, res, next) => {
       const requester = req.decoded.email;
@@ -135,6 +137,23 @@ async function run() {
       res.send(result);
     });
 
+    app.post("/review", verifyJWT, async (req, res) => {
+      const review = req.body;
+      console.log(review);
+      const result = await reviewCollection .insertOne(review);
+      res.send(result);
+    });
+
+    app.get("/reviews", async (req, res) => {
+      const limit = Number(req.query.limit);
+      const cursor = reviewCollection .find();
+
+      const result = await cursor.limit(limit).toArray();
+
+      res.send(result);
+    });
+
+
     app.delete("/product/:id", verifyJWT, verifyAdmin, async (req, res) => {
       const id = req.params.id;
       const filter = { _id: ObjectId(id) };
@@ -144,7 +163,7 @@ async function run() {
       res.send(result);
     });
 
-    app.patch("/order/:id", async (req, res) => {
+    app.patch("/order/:id",verifyJWT,  async (req, res) => {
       const id = req.params.id;
       const orders = req.body;
       // console.log(orders);
@@ -154,14 +173,25 @@ async function run() {
           availableQuantity: orders.newQuan,
         },
       };
-
-      
-
       const result = await ordersCollection.insertOne(orders.order);
       const updatedTools = await toolsCollection.updateOne(filter, updatedDoc);
       sendOrderConfirmationEmail(orders.order)
       res.send(updatedTools);
     });
+
+    app.patch('/status/:id', verifyJWT,  verifyAdmin, async(req, res)=>{
+      const id = req.params.id;
+      const orders = req.body;
+      console.log(orders)
+      const filter = { _id: ObjectId(id) };
+      const updatedDoc = {
+        $set: {
+          status: orders.status,
+        },
+      };
+      const updatedStatus = await ordersCollection.updateOne(filter, updatedDoc);
+      res.send(updatedStatus);
+    })
 
     app.patch('/payment/:id', verifyJWT,  async(req, res)=>{
       const id  = req.params.id;
@@ -190,6 +220,17 @@ async function run() {
       res.send(booking)
     } )
 
+ app.get('/mangeorder', verifyJWT, verifyAdmin, async(req,res)=>{
+  const limit = Number(req.query.limit);
+  const cursor = ordersCollection  .find();
+
+  const result = await cursor.limit(limit).toArray();
+
+  res.send(result);
+ })
+
+
+
     app.get("/orders", verifyJWT, async (req, res) => {
       const user = req.query.user;
       const decodedEmail = req.decoded.email;
@@ -209,6 +250,13 @@ async function run() {
       res.send({ admin: isAdmin });
     });
 
+    app.get("/profile/:email", verifyJWT,  async(req, res)=>{
+      const email=req.params.email;
+      const user = await profileCollection.findOne({ email: email });
+      console.log(user)
+      res.send(user)
+    })
+
     app.get("/user", verifyJWT, async (req, res) => {
       const users = await userCollection.find().toArray();
       res.send(users);
@@ -223,6 +271,34 @@ async function run() {
       const result = await userCollection.updateOne(filter, updateDoc);
       res.send(result);
     });
+
+    app.put("/users/:email", verifyJWT, async (req, res) => {
+      const email = req.params.email;
+      const user = req.body;
+      const filter = { email: email };
+      const options = { upsert: true };
+      const updateDoc = {
+        $set: user,
+      };
+      const result = await profileCollection.updateOne(filter, updateDoc, options);
+ 
+      res.send(result);
+    });
+
+    // app.put("/user/:email", async (req, res) => {
+    //   const email = req.params.email;
+    //   console.log(email)
+    //   const user = req.body;
+    //   console.log(user)
+    //   const filter = { email: email };
+    //   const options = { upsert: true };
+    //   const updateDoc = {
+    //     $set: user,
+    //   };
+    //   const result = await userCollection.updateOne(filter, updateDoc, options);
+    //   res.send( result);
+    // });
+
 
     app.put("/user/:email", async (req, res) => {
       const email = req.params.email;
